@@ -209,7 +209,13 @@ function restoreOpsFor(entry) {
   return [{ op: 'set_property', artist_id: entry.id, kind: entry.kind, name: 'visible', value: true }];
 }
 
-export default function Inspector({ entry, onApply, onToast }) {
+function axesIndexFromId(id) {
+  // axes_3 → 3; axes_3_line_0 → 3; etc.
+  const m = /^axes_(\d+)/.exec(id || '');
+  return m ? parseInt(m[1], 10) : null;
+}
+
+export default function Inspector({ entry, onApply, onToast, onExtractAxes }) {
   if (!entry) {
     return (
       <aside className="inspector-panel">
@@ -238,7 +244,12 @@ export default function Inspector({ entry, onApply, onToast }) {
     restoreOpsFor(entry).forEach((op) => onApply(op));
     if (onToast) onToast(`Restored ${entry.id}`);
   };
-  const hasActions = deleted || deleteOps.length > 0;
+  const axesIdx = entry.kind === 'Axes' ? axesIndexFromId(entry.id) : null;
+  const handleExtract = () => {
+    if (axesIdx == null || !onExtractAxes) return;
+    onExtractAxes(axesIdx);
+  };
+  const hasActions = deleted || deleteOps.length > 0 || axesIdx != null;
   return (
     <aside className="inspector-panel">
       <header>
@@ -246,11 +257,20 @@ export default function Inspector({ entry, onApply, onToast }) {
         <div className="kind">{entry.kind} · {entry.label}</div>
         {hasActions && (
           <div className="actions">
+            {axesIdx != null && (
+              <button
+                className="subtle"
+                onClick={handleExtract}
+                title="Clone this subplot into a brand-new figure in the session"
+              >
+                ⤴ Extract as new plot
+              </button>
+            )}
             {deleted ? (
               <button className="subtle" onClick={handleRestore}>↺ Restore</button>
-            ) : (
+            ) : deleteOps.length > 0 ? (
               <button className="danger" onClick={handleDelete}>✕ Delete</button>
-            )}
+            ) : null}
           </div>
         )}
       </header>

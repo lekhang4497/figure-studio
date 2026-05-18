@@ -16,7 +16,7 @@ from figure_studio.server import create_app
 async def app_with_state():
     fig = ef.two_lines_with_legend()
     state = FigureState(fig=fig)
-    app = create_app(state)
+    app = create_app(legacy_single_state=state)
     return app, state
 
 
@@ -162,7 +162,7 @@ async def test_index_has_no_store_cache_header():
     keep the index.html out of browser cache so new bundles always load."""
     fig = ef.simple_line()
     state = FigureState(fig=fig)
-    app = create_app(state)
+    app = create_app(legacy_single_state=state)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         r = await client.get("/")
@@ -175,7 +175,7 @@ async def test_axes_include_in_export_renders_smaller_pdf(app_with_state):
     """Hiding axes via include_in_export should produce a tighter 'main' PDF."""
     fig = ef.grid_of_kinds()
     state = FigureState(fig=fig)
-    app = create_app(state)
+    app = create_app(legacy_single_state=state)
     from figure_studio.edit_ops import SetProperty
 
     await state.apply(SetProperty(artist_id="axes_2", kind="Axes", name="include_in_export", value=False))

@@ -39,6 +39,9 @@ dev = [
     "httpx>=0.27",
 ]
 
+[project.scripts]
+figure-studio = "figure_studio.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/lekhang4497/figure-studio"
 

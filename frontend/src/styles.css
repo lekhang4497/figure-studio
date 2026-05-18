@@ -289,6 +289,77 @@ kbd {
   background: var(--accent-red);
   box-shadow: 0 0 0 3px var(--accent-red-soft);
 }
+.topbar .status.idle::before {
+  background: var(--text-tertiary);
+  box-shadow: 0 0 0 3px var(--bg-secondary);
+}
+.topbar .fig-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  background: var(--bg-secondary);
+  border-radius: 999px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.topbar .fig-chip .name { color: var(--text-primary); font-weight: 600; }
+
+/* ----- Figure picker (sidebar) ----- */
+
+.figure-picker { border-bottom: 1px solid var(--border-subtle); padding-bottom: 8px; }
+.figure-picker h3 {
+  font-size: 11px;
+  margin: 14px 14px 6px;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.figure-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: background 60ms ease, color 60ms ease;
+  border-left: 2px solid transparent;
+}
+.figure-row:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.figure-row.active {
+  background: var(--accent-blue-soft);
+  color: var(--text-primary);
+  border-left-color: var(--accent-blue);
+}
+.figure-row .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+  flex: 0 0 8px;
+}
+.figure-row.active .dot { background: var(--accent-blue); }
+.figure-row .name {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.figure-row .meta { font-size: 10px; color: var(--text-tertiary); }
+.figure-row .close {
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  opacity: 0;
+  transition: opacity 60ms;
+}
+.figure-row:hover .close { opacity: 1; }
 
 /* --------------------------------------------------------------------------
  * Tree sidebar

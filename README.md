@@ -43,8 +43,65 @@ pip install -e .
 python examples/demo.py
 ```
 
+## Standalone server + Session API (multi-figure)
+
+For workflows where you want to keep one editor open and push multiple figures
+to it from any script or notebook, run a long-running server and use
+`figure_studio.connect()` from Python:
+
+```bash
+# Terminal 1 — start the server (auto-opens the browser):
+figure-studio serve --port 8765
+```
+
+```python
+# Terminal 2 / notebook / any other script:
+import matplotlib.pyplot as plt
+import figure_studio
+
+session = figure_studio.connect(port=8765)   # autostart=True → spawns server if none
+
+fig1, ax = plt.subplots(); ax.plot([0, 1, 2], [1, 3, 2])
+session.add(fig1, name="lines")
+
+fig2, ax = plt.subplots(); ax.bar(["a", "b", "c"], [3, 1, 2])
+session.add(fig2, name="bars")
+
+session.list()                # ['lines', 'bars']
+session.url()                 # http://127.0.0.1:8765/
+
+edited = session.get("lines") # fresh Figure with all in-browser edits applied
+session.export_pdf("lines", "lines.pdf")
+session.export_code("lines", "lines.py")
+```
+
+The UI shows a **figure picker** in the left sidebar — click a name to switch
+between them. When an axes is selected, the inspector has an **"⤴ Extract as
+new plot"** button that clones that subplot into its own brand-new figure in
+the session.
+
+## Notebook (Jupyter) usage
+
+`figure_studio.connect()` auto-starts a local server in the background when
+the kernel calls it. Displaying the Session in a cell renders the editor as
+an inline iframe:
+
+```python
+import matplotlib.pyplot as plt, figure_studio
+session = figure_studio.connect(port=8765)
+fig, ax = plt.subplots(); ax.plot([0,1,2], [1,3,2])
+session.add(fig, name="my_plot")
+session        # ← renders the editor iframe in the cell output
+```
+
+See [`examples/notebook_demo.ipynb`](examples/notebook_demo.ipynb) for a full
+walkthrough including round-tripping the edited figure back into Python.
+
 ## Features
 
+- **Multi-figure session.** Start `figure-studio serve` once, push figures from any script/notebook with `session.add(fig, name=...)`. Pick the active figure in the sidebar.
+- **Extract a subplot into its own figure.** Click an axes → "⤴ Extract as new plot" in the inspector clones the subplot into a brand-new figure in the session.
+- **Notebook-native.** `session._repr_html_` renders the editor as an inline iframe; `session.get(name)` returns the edited matplotlib `Figure` for further use.
 - **Schema-driven inspector.** Lines, scatter, bars, text, legends, axes — all editable: colors, linewidths, marker size/style, font, alpha, grid, scale, limits, position, legend location, and more. Adding a new editable property is a one-line schema change.
 - **Edit bar groups at once.** `ax.bar(...)` returns a `BarContainer`; clicking any bar selects the whole group so the edit fans out to every bar. Shift-click for per-bar override; individual bars listed in the sidebar.
 - **Delete components.** Inspector delete button clears text or hides any artist. `Cmd/Ctrl-Z` restores it.
@@ -70,6 +127,7 @@ You can also force it via `FIGURE_STUDIO_HEADLESS=1` or `figure_studio.launch(fi
 ## API
 
 ```python
+# Single-figure blocking launch (v0.1 API, still works):
 figure_studio.launch(
     fig,
     port=8765,                # tries the next free port if busy
@@ -78,9 +136,29 @@ figure_studio.launch(
     session_path=None,        # default: <calling-script>.figure_studio.json
     log_level="warning",
 )
+
+# Multi-figure Session client (v0.2):
+session = figure_studio.connect(host="127.0.0.1", port=8765, autostart=True)
+session.add(fig, name=None, overwrite=True)              # returns the registered name
+session.get(name) -> matplotlib.figure.Figure            # fetch the edited live figure
+session.list() / session.list_meta()                     # what's on the server
+session.remove(name)
+session.extract_axes(name, axes_index, as_name=None)     # clone a subplot
+session.export_pdf(name, path, only_visible=False)
+session.export_png(name, path, dpi=300)
+session.export_code(name, path)
+session.url(name=None) / session.open_browser(name=None)
+
+# Convenience one-liner (connect + add + return session):
+figure_studio.show(fig, name="my_plot", port=8765)
 ```
 
-The function blocks until you press <kbd>Ctrl+C</kbd>. On exit it flushes any pending session save.
+CLI:
+
+```
+figure-studio serve [--port 8765] [--host 127.0.0.1] [--no-browser]
+figure-studio version
+```
 
 ## How exports work
 
@@ -101,7 +179,7 @@ git clone https://github.com/lekhang4497/figure-studio.git
 cd figure-studio
 python -m venv .venv && . .venv/bin/activate
 pip install -e .[dev]
-pytest                    # 44 tests, ~5s
+pytest                    # 57 tests, ~5s
 
 cd frontend
 npm install
@@ -109,11 +187,11 @@ npm run dev               # vite dev server on :5173, proxies /api and /ws to th
 npm run build             # rebuilds the static bundle into ../src/figure_studio/static/
 ```
 
-## What's *not* in v1
+## What's *not* in yet
 
 - 3D, contour, heatmap, broken-axes editing — the schema scaffolding for adding these is in `src/figure_studio/artist_introspect.py`; we just haven't written the per-type dicts yet.
-- Jupyter widget that embeds the UI inline. For now `figure_studio.launch(fig)` in a cell blocks the kernel — close the browser to release it.
-- Browser-based undo across server restarts. Reload the page → undo stack is empty; the *figure* state is intact via the sidecar.
+- Browser-based undo across server restarts. Reload the page → undo stack is empty; the *figure* state is intact via the sidecar / live server.
+- Authentication. The server binds to `127.0.0.1` by default and pickles are accepted unverified — only run it on a host you trust.
 
 ## License
 
