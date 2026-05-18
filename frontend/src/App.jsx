@@ -69,16 +69,7 @@ function TreeSidebar({ tree, selectedId, onSelect }) {
           title={entry.id}
         >
           <span className="kind">{entry.kind}</span>
-          <span
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              textDecoration: isDeleted ? 'line-through' : 'none',
-            }}
-          >
-            {entry.label}
-          </span>
+          <span className="label">{entry.label}</span>
         </div>
         {children.map((c) => renderNode(c, depth + 1))}
       </React.Fragment>

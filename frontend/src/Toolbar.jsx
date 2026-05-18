@@ -53,15 +53,17 @@ export default function Toolbar({ snapshot, presets, status, onApply, onToast, u
   };
 
   const statusClass =
-    status === 'open' ? 'status dot' : status === 'connecting' ? 'status dot warn' : 'status dot err';
+    status === 'open' ? 'status' : status === 'connecting' ? 'status warn' : 'status err';
   const statusText =
-    status === 'open' ? 'connected' : status === 'connecting' ? 'connecting…' : 'disconnected';
+    status === 'open' ? 'Connected' : status === 'connecting' ? 'Connecting…' : 'Disconnected';
 
   return (
     <div className="topbar">
       <div className="brand">
+        <span className="mark" aria-hidden="true">◆</span>
         figure-studio<small>v0.1</small>
       </div>
+      <span className="divider" />
 
       <div className="group">
         <label className="tiny">width</label>
@@ -70,19 +72,19 @@ export default function Toolbar({ snapshot, presets, status, onApply, onToast, u
           step="0.05"
           min="0.5"
           max="20"
-          style={{ width: 64 }}
+          style={{ width: 68 }}
           value={fmt(w)}
           onChange={(e) => setW(parseFloat(e.target.value))}
           onBlur={() => sendSize(w, h)}
           onKeyDown={(e) => e.key === 'Enter' && sendSize(w, h)}
         />
-        <label className="tiny">×</label>
+        <span className="tiny">×</span>
         <input
           type="number"
           step="0.05"
           min="0.5"
           max="20"
-          style={{ width: 64 }}
+          style={{ width: 68 }}
           value={fmt(h)}
           onChange={(e) => setH(parseFloat(e.target.value))}
           onBlur={() => sendSize(w, h)}
@@ -103,28 +105,34 @@ export default function Toolbar({ snapshot, presets, status, onApply, onToast, u
         </select>
       </div>
 
+      <span className="divider" />
+
       <div className="group">
-        <button onClick={onUndo} disabled={!undoCount} title="Cmd/Ctrl-Z">
-          ↺ undo ({undoCount})
+        <button className="subtle" onClick={onUndo} disabled={!undoCount} title="Cmd/Ctrl-Z">
+          ↺ Undo ({undoCount})
         </button>
-        <button onClick={onSave} title="Cmd/Ctrl-S">save</button>
-        <button onClick={onReset} className="danger" title="Clear edit log">reset</button>
+        <button className="subtle" onClick={onSave} title="Cmd/Ctrl-S">Save</button>
+        <button className="danger" onClick={onReset} title="Clear edit log">Reset</button>
       </div>
 
       <div className="grow" />
 
       <div className="group">
-        <button onClick={exportCode}>export .py</button>
-        <button onClick={exportPng}>export .png</button>
-        <button onClick={exportPdfMain} title="PDF with axes flagged include_in_export=False hidden">
-          export main.pdf
+        <button className="subtle" onClick={exportCode}>.py</button>
+        <button className="subtle" onClick={exportPng}>.png</button>
+        <button
+          className="subtle"
+          onClick={exportPdfMain}
+          title="PDF with axes flagged include_in_export=False hidden"
+        >
+          main.pdf
         </button>
-        <button onClick={exportPdf} className="primary" title="Cmd/Ctrl-E">
-          export pdf
+        <button className="primary" onClick={exportPdf} title="Cmd/Ctrl-E">
+          Export PDF
         </button>
       </div>
 
-      <div className={statusClass}>{statusText}</div>
+      <span className={statusClass}>{statusText}</span>
     </div>
   );
 }

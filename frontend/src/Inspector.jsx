@@ -215,13 +215,14 @@ export default function Inspector({ entry, onApply, onToast }) {
       <aside className="inspector-panel">
         <div className="empty">
           <strong>No artist selected.</strong>
-          <div style={{ marginTop: 6 }}>
+          <p>
             Click anything on the figure (a line, a bar, an axis, a label) to edit its
             properties. Use the left sidebar to pick from the full artist tree.
-          </div>
-          <div style={{ marginTop: 12 }}>
-            Shortcuts: <kbd>Cmd/Ctrl-Z</kbd> undo · <kbd>Cmd/Ctrl-S</kbd> save ·
-            <kbd>Cmd/Ctrl-E</kbd> export PDF
+          </p>
+          <div className="shortcuts">
+            <kbd>⌘Z</kbd> undo
+            <kbd>⌘S</kbd> save
+            <kbd>⌘E</kbd> export PDF
           </div>
         </div>
       </aside>
@@ -231,24 +232,27 @@ export default function Inspector({ entry, onApply, onToast }) {
   const deleteOps = deleteOpsFor(entry);
   const handleDelete = () => {
     deleteOps.forEach((op) => onApply(op));
-    if (onToast) onToast(`Deleted ${entry.id} (Cmd/Ctrl-Z to undo)`);
+    if (onToast) onToast(`Deleted ${entry.id} — ⌘Z to undo`);
   };
   const handleRestore = () => {
     restoreOpsFor(entry).forEach((op) => onApply(op));
     if (onToast) onToast(`Restored ${entry.id}`);
   };
+  const hasActions = deleted || deleteOps.length > 0;
   return (
     <aside className="inspector-panel">
       <header>
         <div className="title">{entry.id}</div>
         <div className="kind">{entry.kind} · {entry.label}</div>
-        <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
-          {deleted ? (
-            <button className="subtle" onClick={handleRestore}>↺ restore</button>
-          ) : deleteOps.length > 0 ? (
-            <button className="danger" onClick={handleDelete}>✕ delete</button>
-          ) : null}
-        </div>
+        {hasActions && (
+          <div className="actions">
+            {deleted ? (
+              <button className="subtle" onClick={handleRestore}>↺ Restore</button>
+            ) : (
+              <button className="danger" onClick={handleDelete}>✕ Delete</button>
+            )}
+          </div>
+        )}
       </header>
       <div className="prop-grid">
         {entry.properties.map((p) => (
