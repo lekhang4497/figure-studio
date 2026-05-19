@@ -202,56 +202,160 @@ def _pickle_figure(fig) -> bytes:
 # ---------------------------------------------------------------------------
 
 
-def _combine_figures(source_figs: List[Any], rows: int, cols: int):
-    """Build a new ``Figure`` of ``rows × cols`` cells whose contents come from
-    deep-copied axes of ``source_figs``.
+def _copy_axes_content(src_ax, dest_ax) -> None:
+    """Re-create the visible artists of ``src_ax`` inside ``dest_ax``.
 
-    The Nth source figure (in order) populates cell N (row-major). Each
-    source's own multi-axes layout is preserved within its cell — axes
-    positions are remapped from source-figure-fraction to cell-fraction.
-    Sources that don't fit (``len > rows * cols``) are silently dropped.
+    Direct axes-transplant (``ax.figure = new_fig``) fails because matplotlib
+    caches transforms against the source figure's dpi/size. Instead we replay
+    each artist via the high-level constructors (.plot, .scatter, .bar) so
+    the dest axes computes its own transforms cleanly.
+
+    Handles Line2D, PathCollection (scatter), BarContainer (preserves the
+    container so figure-studio's BarGroup editing still works), lone
+    Rectangles, Text, plus titles/labels/lims/scale/grid/facecolor/legend.
+    More exotic artists (twinx axes, 3D, contours, custom collections) are
+    not preserved.
     """
-    from matplotlib.figure import Figure
-    from matplotlib.backends.backend_agg import FigureCanvasAgg
+    from matplotlib.container import BarContainer
+    from matplotlib.patches import Rectangle
 
+    for line in src_ax.lines:
+        dest_ax.plot(
+            line.get_xdata(), line.get_ydata(),
+            color=line.get_color(), linewidth=line.get_linewidth(),
+            linestyle=line.get_linestyle(),
+            marker=line.get_marker(), markersize=line.get_markersize(),
+            alpha=line.get_alpha(), label=line.get_label(),
+        )
+
+    for coll in src_ax.collections:
+        try:
+            offsets = coll.get_offsets()
+            if len(offsets) == 0:
+                continue
+            sizes = coll.get_sizes()
+            fc = coll.get_facecolor()
+            ec = coll.get_edgecolor()
+            dest_ax.scatter(
+                offsets[:, 0], offsets[:, 1],
+                s=list(sizes) if len(sizes) > 0 else 36,
+                c=list(fc) if len(fc) > 0 else None,
+                edgecolors=list(ec) if len(ec) > 0 else None,
+                alpha=coll.get_alpha(),
+                label=coll.get_label(),
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Could not copy collection: %s", exc)
+
+    consumed = set()
+    for container in getattr(src_ax, "containers", []) or []:
+        if not isinstance(container, BarContainer):
+            continue
+        xs, heights, widths, bottoms, colors = [], [], [], [], []
+        for patch in container.patches:
+            x, y = patch.get_xy()
+            xs.append(x + patch.get_width() / 2)
+            heights.append(patch.get_height())
+            widths.append(patch.get_width())
+            bottoms.append(y)
+            colors.append(patch.get_facecolor())
+            consumed.add(id(patch))
+        if xs:
+            label = container.get_label() if hasattr(container, "get_label") else None
+            label = None if (label or "").startswith("_") else label
+            dest_ax.bar(xs, heights, width=widths, bottom=bottoms, color=colors, label=label)
+
+    for patch in src_ax.patches:
+        if id(patch) in consumed:
+            continue
+        if patch is getattr(src_ax, "patch", None):
+            continue
+        if isinstance(patch, Rectangle):
+            x, y = patch.get_xy()
+            dest_ax.add_patch(Rectangle(
+                (x, y), patch.get_width(), patch.get_height(),
+                facecolor=patch.get_facecolor(),
+                edgecolor=patch.get_edgecolor(),
+                linewidth=patch.get_linewidth(),
+                alpha=patch.get_alpha(),
+            ))
+
+    for text in src_ax.texts:
+        dest_ax.text(
+            *text.get_position(),
+            text.get_text(),
+            color=text.get_color(), fontsize=text.get_fontsize(),
+            ha=text.get_horizontalalignment(), va=text.get_verticalalignment(),
+            rotation=text.get_rotation(), alpha=text.get_alpha(),
+        )
+
+    if src_ax.get_title():
+        dest_ax.set_title(src_ax.get_title())
+    if src_ax.get_xlabel():
+        dest_ax.set_xlabel(src_ax.get_xlabel())
+    if src_ax.get_ylabel():
+        dest_ax.set_ylabel(src_ax.get_ylabel())
+    try: dest_ax.set_xlim(src_ax.get_xlim())
+    except Exception: pass
+    try: dest_ax.set_ylim(src_ax.get_ylim())
+    except Exception: pass
+    try: dest_ax.set_xscale(src_ax.get_xscale())
+    except Exception: pass
+    try: dest_ax.set_yscale(src_ax.get_yscale())
+    except Exception: pass
+    try:
+        if any(g.get_visible() for g in src_ax.xaxis.get_gridlines()):
+            dest_ax.grid(True)
+    except Exception:
+        pass
+    try: dest_ax.set_facecolor(src_ax.get_facecolor())
+    except Exception: pass
+    if src_ax.get_legend() is not None:
+        dest_ax.legend()
+
+
+def _combine_figures(source_figs: List[Any], rows: int, cols: int):
+    """Build a new ``Figure`` with a ``rows × cols`` subplot grid; copy each
+    source figure's first axes into the matching cell.
+
+    Uses ``plt.subplots`` for the grid so matplotlib handles positioning
+    correctly, then replays each source axes' visible artists via
+    :func:`_copy_axes_content`. Empty cells (when ``len(sources) < rows*cols``)
+    are hidden via ``axis('off')``.
+
+    The result is a fully editable matplotlib Figure — clicking lines/bars
+    in figure-studio works exactly as on any other figure.
+    """
     if rows < 1 or cols < 1:
         raise HTTPException(422, detail="rows and cols must be >= 1")
-    n_cells = rows * cols
     if not source_figs:
         raise HTTPException(422, detail="combine requires at least one source figure")
 
-    # Pick a figsize: keep average source size, scaled by grid.
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    n_cells = rows * cols
     avg_w = sum(s.get_size_inches()[0] for s in source_figs) / len(source_figs)
     avg_h = sum(s.get_size_inches()[1] for s in source_figs) / len(source_figs)
-    new_fig = Figure(figsize=(avg_w * cols, avg_h * rows))
+    new_fig, dest_axes = plt.subplots(rows, cols, figsize=(avg_w * cols, avg_h * rows))
     FigureCanvasAgg(new_fig)
-    try:
-        new_fig.set_layout_engine("none")
-    except Exception:
-        pass
-
-    margin = 0.06   # outer + inter-cell gutter, figure-fraction
-    cell_w = (1 - margin * (cols + 1)) / cols
-    cell_h = (1 - margin * (rows + 1)) / rows
+    flat = list(np.atleast_1d(dest_axes).flatten())
 
     for i, src_fig in enumerate(source_figs[:n_cells]):
-        # Deep copy via pickle so transplanting doesn't disturb the source.
-        copy = _unpickle_figure(_pickle_figure(src_fig))
-        if not copy.axes:
+        if not src_fig.axes:
+            flat[i].axis("off")
             continue
-        r, c = divmod(i, cols)
-        cell_x = margin + c * (cell_w + margin)
-        cell_y = 1.0 - margin - (r + 1) * cell_h - r * margin
-        for ax in list(copy.axes):
-            ox, oy, ow, oh = ax.get_position().bounds
-            new_x = cell_x + ox * cell_w
-            new_y = cell_y + oy * cell_h
-            new_w = max(0.02, ow * cell_w)
-            new_h = max(0.02, oh * cell_h)
-            ax.remove()
-            ax.figure = new_fig
-            ax.set_position([new_x, new_y, new_w, new_h])
-            new_fig.add_axes(ax)
+        _copy_axes_content(src_fig.axes[0], flat[i])
+
+    # Hide trailing empty cells
+    for j in range(len(source_figs), n_cells):
+        flat[j].axis("off")
+
+    try:
+        new_fig.tight_layout()
+    except Exception:
+        pass
     return new_fig
 
 
@@ -344,7 +448,7 @@ def create_app(
     if provided, the figure is auto-registered under the name ``default`` and
     the un-scoped /api routes alias to it for backwards compat.
     """
-    app = FastAPI(title="figure-studio", version="0.4.0")
+    app = FastAPI(title="figure-studio", version="0.4.1")
     if registry is None:
         registry = FigureRegistry()
     app.state.registry = registry
@@ -403,7 +507,7 @@ def create_app(
 
     @app.get("/healthz")
     async def healthz() -> JSONResponse:
-        return JSONResponse({"ok": True, "version": "0.4.0", "figures": registry.names()})
+        return JSONResponse({"ok": True, "version": "0.4.1", "figures": registry.names()})
 
     # ----- registry (figures list + add/remove) -----
 

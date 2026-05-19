@@ -35,12 +35,18 @@ def test_combine_helper_1x2():
     assert buf.getvalue()[:4] == b"%PDF"
 
 
-def test_combine_helper_preserves_multi_axes_source():
-    """A source with 2 axes contributes 2 axes to its cell."""
+def test_combine_helper_uses_first_axes_of_each_source():
+    """Each cell holds the first axes of its source. Sources with multiple
+    axes contribute only their first; to combine specific subplots, use the
+    extract endpoint first to split them into single-axes figures."""
     a = ef.simple_line()
-    b = ef.grid_of_kinds()   # 4 axes
+    b = ef.grid_of_kinds()   # 4 axes — only the first will be used
     combined = _combine_figures([a, b], 1, 2)
-    assert len(combined.axes) == 5   # 1 + 4
+    assert len(combined.axes) == 2
+    # First cell came from `a` (title 'Trig')
+    assert combined.axes[0].get_title() == "Trig"
+    # Second cell came from b's first axes (title 'Lines')
+    assert combined.axes[1].get_title() == "Lines"
 
 
 def test_combine_helper_drops_excess_sources():
