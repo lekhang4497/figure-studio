@@ -102,6 +102,9 @@ walkthrough including round-tripping the edited figure back into Python.
 - **Multi-figure session.** Start `figure-studio serve` once, push figures from any script/notebook with `session.add(fig, name=...)`. Pick the active figure in the sidebar.
 - **Extract a subplot into its own figure.** Click an axes → "⤴ Extract as new plot" in the inspector clones the subplot into a brand-new figure in the session.
 - **Notebook-native.** `session._repr_html_` renders the editor as an inline iframe; `session.get(name)` returns the edited matplotlib `Figure` for further use.
+- **Curated color palettes.** Apply Okabe-Ito / Wong / Tableau / ColorBrewer / Viridis / Nord / seaborn / IEEE grayscale with one click. Colourblind-safe palettes are flagged in the dropdown.
+- **PDF export, your way.** Default **Export PDF** ships a flush `pad_inches=0` PDF, ready to drop into a LaTeX `\includegraphics`. A separate **padded.pdf** keeps matplotlib's default margin if you prefer it.
+- **Copy generated Python to clipboard.** The 📋 .py button copies the standalone `figure.py` to your clipboard — paste straight into the script you're writing.
 - **Schema-driven inspector.** Lines, scatter, bars, text, legends, axes — all editable: colors, linewidths, marker size/style, font, alpha, grid, scale, limits, position, legend location, and more. Adding a new editable property is a one-line schema change.
 - **Edit bar groups at once.** `ax.bar(...)` returns a `BarContainer`; clicking any bar selects the whole group so the edit fans out to every bar. Shift-click for per-bar override; individual bars listed in the sidebar.
 - **Delete components.** Inspector delete button clears text or hides any artist. `Cmd/Ctrl-Z` restores it.
@@ -179,7 +182,7 @@ git clone https://github.com/lekhang4497/figure-studio.git
 cd figure-studio
 python -m venv .venv && . .venv/bin/activate
 pip install -e .[dev]
-pytest                    # 57 tests, ~5s
+pytest                    # 69 tests, ~6s
 
 cd frontend
 npm install

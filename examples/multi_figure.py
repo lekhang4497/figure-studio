@@ -38,8 +38,8 @@ def main() -> None:
     axes[1, 1].plot(x, np.exp(-x / 5) * np.sin(x)); axes[1, 1].set_title("damped")
     fig3.tight_layout()
 
-    # autostart=True spins up a local server on port 8765 if you haven't already.
-    session = figure_studio.connect(port=8765)
+    # autostart=True spins up a local server on port 8766 if you haven't already.
+    session = figure_studio.connect(port=8766)
     session.add(fig1, name="trig")
     session.add(fig2, name="bars")
     session.add(fig3, name="grid")

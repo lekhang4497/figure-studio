@@ -116,13 +116,27 @@ class FigureState:
             self.fig.savefig(buf, format="svg", bbox_inches=None)
             return buf.getvalue()
 
-    async def render_pdf(self, only_visible_axes: bool = False) -> bytes:
+    async def render_pdf(
+        self,
+        only_visible_axes: bool = False,
+        pad_inches: Optional[float] = None,
+    ) -> bytes:
+        """Render the figure to a PDF.
+
+        ``pad_inches`` controls the whitespace margin around the trimmed
+        bounding box. ``None`` keeps matplotlib's default (0.1″). ``0``
+        gives a truly flush PDF — useful when the figure will be embedded
+        in a LaTeX figure environment that adds its own padding.
+        """
         async with self.lock:
             if only_visible_axes:
-                pdf_bytes = self._render_pdf_visible_axes_only()
+                pdf_bytes = self._render_pdf_visible_axes_only(pad_inches=pad_inches)
             else:
                 buf = io.BytesIO()
-                self.fig.savefig(buf, format="pdf", bbox_inches="tight")
+                kw: Dict[str, Any] = {"bbox_inches": "tight"}
+                if pad_inches is not None:
+                    kw["pad_inches"] = float(pad_inches)
+                self.fig.savefig(buf, format="pdf", **kw)
                 pdf_bytes = buf.getvalue()
             return pdf_bytes
 
@@ -139,10 +153,14 @@ class FigureState:
     # to fill the canvas. Implemented as a code-gen-time transform — we do NOT
     # mutate the live figure.
 
-    def _render_pdf_visible_axes_only(self) -> bytes:
+    def _render_pdf_visible_axes_only(self, pad_inches: Optional[float] = None) -> bytes:
         import copy
 
         from matplotlib import pyplot as plt
+
+        save_kw: Dict[str, Any] = {"format": "pdf", "bbox_inches": "tight"}
+        if pad_inches is not None:
+            save_kw["pad_inches"] = float(pad_inches)
 
         visible = [
             ax for ax in self.fig.axes
@@ -150,7 +168,7 @@ class FigureState:
         ]
         if len(visible) == len(self.fig.axes):
             buf = io.BytesIO()
-            self.fig.savefig(buf, format="pdf", bbox_inches="tight")
+            self.fig.savefig(buf, **save_kw)
             return buf.getvalue()
         # Hide the excluded axes temporarily and re-tile the visible ones.
         hidden_states: List[tuple] = []
@@ -163,10 +181,9 @@ class FigureState:
                     ax.set_visible(False)
             n = len(visible)
             if n == 0:
-                # Nothing to render — fall back to a blank PDF.
                 blank = Figure(figsize=self.fig.get_size_inches())
                 buf = io.BytesIO()
-                blank.savefig(buf, format="pdf", bbox_inches="tight")
+                blank.savefig(buf, **save_kw)
                 return buf.getvalue()
             cols = int(round(n ** 0.5))
             rows = (n + cols - 1) // cols
@@ -179,7 +196,7 @@ class FigureState:
                 y = 1.0 - margin - (r + 1) * cell_h - r * margin
                 ax.set_position([x, y, cell_w, cell_h])
             buf = io.BytesIO()
-            self.fig.savefig(buf, format="pdf", bbox_inches="tight")
+            self.fig.savefig(buf, **save_kw)
             return buf.getvalue()
         finally:
             for ax, was_visible in hidden_states:

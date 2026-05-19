@@ -96,6 +96,11 @@ export async function fetchPresets() {
   return r.json();
 }
 
+export async function fetchPalettes() {
+  const r = await fetch('/api/palettes');
+  return r.json();
+}
+
 export async function fetchFigureState(name) {
   const r = await fetch(`/api/figures/${encodeName(name)}/state`);
   if (!r.ok) throw new Error(`figure ${name} not found`);
@@ -131,8 +136,11 @@ export async function extractAxes(name, axesIndex, asName) {
   return r.json();
 }
 
-export function exportPdfUrl(name, { onlyVisible = false } = {}) {
-  const qs = onlyVisible ? '?only_visible=true' : '';
+export function exportPdfUrl(name, { onlyVisible = false, pad = null } = {}) {
+  const parts = [];
+  if (onlyVisible) parts.push('only_visible=true');
+  if (pad !== null && pad !== undefined) parts.push(`pad=${pad}`);
+  const qs = parts.length ? `?${parts.join('&')}` : '';
   return `/api/figures/${encodeName(name)}/export/pdf${qs}`;
 }
 
@@ -142,6 +150,27 @@ export function exportPngUrl(name, dpi = 300) {
 
 export function exportCodeUrl(name) {
   return `/api/figures/${encodeName(name)}/export/code`;
+}
+
+export async function fetchExportedCode(name) {
+  const r = await fetch(exportCodeUrl(name));
+  if (!r.ok) throw new Error(`code export failed: ${r.status}`);
+  return r.text();
+}
+
+export async function copyToClipboard(text) {
+  // navigator.clipboard requires a secure context; fall back to a hidden textarea.
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.focus(); ta.select();
+  try { document.execCommand('copy'); } finally { ta.remove(); }
 }
 
 export function downloadUrl(url, filename) {

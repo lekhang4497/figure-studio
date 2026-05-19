@@ -358,7 +358,7 @@ export default function App() {
       } else if (k === 'e') {
         e.preventDefault();
         if (state.activeFigure) {
-          downloadUrl(exportPdfUrl(state.activeFigure), `${state.activeFigure}.pdf`);
+          downloadUrl(exportPdfUrl(state.activeFigure, { pad: 0 }), `${state.activeFigure}.pdf`);
           showToast(`Exported ${state.activeFigure}.pdf`);
         }
       }

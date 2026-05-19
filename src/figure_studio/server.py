@@ -23,7 +23,7 @@ from typing import Any, Dict, List, Optional, Set
 from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 
-from . import artist_introspect, presets
+from . import artist_introspect, palettes, presets
 from .code_gen import emit_for_session
 from .edit_ops import parse as parse_op
 from .figure_state import FigureState
@@ -286,7 +286,7 @@ def create_app(
     if provided, the figure is auto-registered under the name ``default`` and
     the un-scoped /api routes alias to it for backwards compat.
     """
-    app = FastAPI(title="figure-studio", version="0.2.0")
+    app = FastAPI(title="figure-studio", version="0.3.0")
     if registry is None:
         registry = FigureRegistry()
     app.state.registry = registry
@@ -339,9 +339,13 @@ def create_app(
     async def api_presets() -> JSONResponse:
         return JSONResponse(presets.to_json())
 
+    @app.get("/api/palettes")
+    async def api_palettes() -> JSONResponse:
+        return JSONResponse(palettes.to_json())
+
     @app.get("/healthz")
     async def healthz() -> JSONResponse:
-        return JSONResponse({"ok": True, "version": "0.2.0", "figures": registry.names()})
+        return JSONResponse({"ok": True, "version": "0.3.0", "figures": registry.names()})
 
     # ----- registry (figures list + add/remove) -----
 
@@ -421,11 +425,15 @@ def create_app(
         return Response(svg, media_type="image/svg+xml")
 
     @app.get("/api/figures/{name}/export/pdf")
-    async def api_export_pdf(name: str, only_visible: bool = False) -> Response:
+    async def api_export_pdf(
+        name: str, only_visible: bool = False, pad: Optional[float] = None,
+    ) -> Response:
         state = _state_for(name)
-        pdf = await state.render_pdf(only_visible_axes=only_visible)
-        suffix = "_main" if only_visible else ""
-        filename = f"{name}{suffix}.pdf"
+        pdf = await state.render_pdf(only_visible_axes=only_visible, pad_inches=pad)
+        parts = [name]
+        if only_visible: parts.append("main")
+        if pad == 0: parts.append("tight")
+        filename = "_".join(parts) + ".pdf"
         return Response(
             pdf,
             media_type="application/pdf",
@@ -534,9 +542,11 @@ def create_app(
             return Response(svg, media_type="image/svg+xml")
 
         @app.get("/api/export/pdf")
-        async def api_export_pdf_legacy(only_visible: bool = False) -> Response:
+        async def api_export_pdf_legacy(
+            only_visible: bool = False, pad: Optional[float] = None,
+        ) -> Response:
             state = _default_or_404()
-            pdf = await state.render_pdf(only_visible_axes=only_visible)
+            pdf = await state.render_pdf(only_visible_axes=only_visible, pad_inches=pad)
             suffix = "_main" if only_visible else ""
             return Response(
                 pdf,

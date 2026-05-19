@@ -17,12 +17,14 @@ from textwrap import indent
 from typing import Any, Dict, List, Optional, Tuple
 
 from .edit_ops import (
+    ApplyPalette,
     DisableAutoLayout,
     EditOp,
     SetFigureDpi,
     SetFigureSize,
     SetProperty,
 )
+from .palettes import get as _get_palette
 
 # ---------------------------------------------------------------------------
 # ID → access path
@@ -117,6 +119,34 @@ def _emit_op(op: EditOp) -> List[str]:
             "    fig.set_layout_engine('none')",
             "except Exception:",
             "    pass",
+        ]
+    if isinstance(op, ApplyPalette):
+        # Inline the colours so the generated file has zero figure_studio dependency.
+        pal = _get_palette(op.palette)
+        return [
+            f"# palette: {pal.label}",
+            f"_pal = {json.dumps(pal.colors)}",
+            "for _ax in fig.axes:",
+            "    _i = 0",
+            "    for _ln in _ax.lines:",
+            "        _ln.set_color(_pal[_i % len(_pal)]); _i += 1",
+            "    for _co in _ax.collections:",
+            "        _c = _pal[_i % len(_pal)]",
+            "        try: _co.set_facecolor(_c)",
+            "        except Exception: pass",
+            "        try: _co.set_edgecolor(_c)",
+            "        except Exception: pass",
+            "        _i += 1",
+            "    _seen = set()",
+            "    for _ct in getattr(_ax, 'containers', []) or []:",
+            "        if hasattr(_ct, 'patches'):",
+            "            _cc = _pal[_i % len(_pal)]",
+            "            for _p in _ct.patches:",
+            "                _p.set_facecolor(_cc); _seen.add(id(_p))",
+            "            _i += 1",
+            "    for _p in _ax.patches:",
+            "        if id(_p) in _seen or _p is getattr(_ax, 'patch', None): continue",
+            "        _p.set_facecolor(_pal[_i % len(_pal)]); _i += 1",
         ]
     raise ValueError(f"Unknown op type: {type(op).__name__}")
 

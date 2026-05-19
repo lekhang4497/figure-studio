@@ -185,7 +185,29 @@ class DisableAutoLayout(BaseModel):
                 pass
 
 
-EditOp = Union[SetProperty, SetFigureSize, SetFigureDpi, DisableAutoLayout]
+class ApplyPalette(BaseModel):
+    """Assign a colour palette to every series in the figure.
+
+    The palette is identified by ``key`` (see :mod:`figure_studio.palettes`).
+    Replays at code-gen time as an inlined loop, so the exported script has
+    no figure_studio runtime dependency.
+    """
+
+    op: Literal["apply_palette"] = "apply_palette"
+    palette: str
+
+    def apply(self, fig: Figure, registry: Dict[str, Any]) -> None:
+        from .palettes import apply_to_figure, get
+        try:
+            pal = get(self.palette)
+        except KeyError as exc:
+            raise ValueError(str(exc)) from exc
+        apply_to_figure(fig, pal.colors)
+
+
+EditOp = Union[
+    SetProperty, SetFigureSize, SetFigureDpi, DisableAutoLayout, ApplyPalette,
+]
 
 
 _OP_BY_NAME: Dict[str, Any] = {
@@ -193,6 +215,7 @@ _OP_BY_NAME: Dict[str, Any] = {
     "set_figure_size": SetFigureSize,
     "set_figure_dpi": SetFigureDpi,
     "disable_auto_layout": DisableAutoLayout,
+    "apply_palette": ApplyPalette,
 }
 
 
