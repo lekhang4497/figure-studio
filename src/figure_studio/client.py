@@ -186,6 +186,29 @@ class Session:
         resp = _http_json("POST", url, json_body={})
         return resp["name"]
 
+    def combine(
+        self,
+        names: List[str],
+        rows: int,
+        cols: int,
+        as_name: Optional[str] = None,
+    ) -> str:
+        """Combine N session figures into a single ``rows × cols`` grid.
+
+        The Nth figure populates cell N (row-major). Within each cell, the
+        source figure's own axes layout is preserved. Returns the new name.
+        """
+        url = f"{self.base_url}/api/combine"
+        body = {
+            "figures": list(names),
+            "rows": int(rows),
+            "cols": int(cols),
+        }
+        if as_name:
+            body["as_name"] = as_name
+        resp = _http_json("POST", url, json_body=body)
+        return resp["name"]
+
     # -------- exports --------
 
     def export_pdf(self, name: str, path: str, *, only_visible: bool = False) -> str:

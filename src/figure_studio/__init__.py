@@ -49,7 +49,7 @@ __all__ = [
     "FigureRegistry",
     "create_app",
 ]
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 logger = logging.getLogger("figure_studio")
 if not logger.handlers:

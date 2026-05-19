@@ -30,6 +30,7 @@ export default function Toolbar({
   onToast,
   undoCount,
   onUndo,
+  onOpenCombine,
 }) {
   const figW = snapshot?.figure?.width_in ?? 6;
   const figH = snapshot?.figure?.height_in ?? 4;
@@ -123,7 +124,7 @@ export default function Toolbar({
     <div className="topbar">
       <div className="brand">
         <span className="mark" aria-hidden="true">◆</span>
-        figure-studio<small>v0.3</small>
+        figure-studio<small>v0.4</small>
       </div>
       {showFigName && (
         <>
@@ -198,6 +199,16 @@ export default function Toolbar({
         </button>
         <button className="subtle" onClick={onSave} disabled={!activeFigure} title="Cmd/Ctrl-S">Save</button>
         <button className="danger" onClick={onReset} disabled={!activeFigure} title="Clear edit log">Reset</button>
+        {onOpenCombine && (
+          <button
+            className="subtle"
+            onClick={onOpenCombine}
+            disabled={!figures || figures.length < 1}
+            title="Combine multiple figures into a grid"
+          >
+            ⊞ Combine
+          </button>
+        )}
       </div>
 
       <div className="grow" />

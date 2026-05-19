@@ -100,6 +100,7 @@ walkthrough including round-tripping the edited figure back into Python.
 ## Features
 
 - **Multi-figure session.** Start `figure-studio serve` once, push figures from any script/notebook with `session.add(fig, name=...)`. Pick the active figure in the sidebar.
+- **Combine figures into a grid.** Toolbar **⊞ Combine** button opens a modal: pick rows × cols, order the source figures, and a new combined figure lands in the session. Each source becomes one cell; multi-axes sources preserve their relative layout within the cell.
 - **Extract a subplot into its own figure.** Click an axes → "⤴ Extract as new plot" in the inspector clones the subplot into a brand-new figure in the session.
 - **Notebook-native.** `session._repr_html_` renders the editor as an inline iframe; `session.get(name)` returns the edited matplotlib `Figure` for further use.
 - **Curated color palettes.** Apply Okabe-Ito / Wong / Tableau / ColorBrewer / Viridis / Nord / seaborn / IEEE grayscale with one click. Colourblind-safe palettes are flagged in the dropdown.
@@ -147,6 +148,7 @@ session.get(name) -> matplotlib.figure.Figure            # fetch the edited live
 session.list() / session.list_meta()                     # what's on the server
 session.remove(name)
 session.extract_axes(name, axes_index, as_name=None)     # clone a subplot
+session.combine(names, rows, cols, as_name=None)         # tile N figures into a grid
 session.export_pdf(name, path, only_visible=False)
 session.export_png(name, path, dpi=300)
 session.export_code(name, path)
@@ -182,7 +184,7 @@ git clone https://github.com/lekhang4497/figure-studio.git
 cd figure-studio
 python -m venv .venv && . .venv/bin/activate
 pip install -e .[dev]
-pytest                    # 69 tests, ~6s
+pytest                    # 79 tests, ~7s
 
 cd frontend
 npm install

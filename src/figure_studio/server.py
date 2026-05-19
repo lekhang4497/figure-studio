@@ -198,6 +198,64 @@ def _pickle_figure(fig) -> bytes:
 
 
 # ---------------------------------------------------------------------------
+# Combine multiple figures into a grid
+# ---------------------------------------------------------------------------
+
+
+def _combine_figures(source_figs: List[Any], rows: int, cols: int):
+    """Build a new ``Figure`` of ``rows × cols`` cells whose contents come from
+    deep-copied axes of ``source_figs``.
+
+    The Nth source figure (in order) populates cell N (row-major). Each
+    source's own multi-axes layout is preserved within its cell — axes
+    positions are remapped from source-figure-fraction to cell-fraction.
+    Sources that don't fit (``len > rows * cols``) are silently dropped.
+    """
+    from matplotlib.figure import Figure
+    from matplotlib.backends.backend_agg import FigureCanvasAgg
+
+    if rows < 1 or cols < 1:
+        raise HTTPException(422, detail="rows and cols must be >= 1")
+    n_cells = rows * cols
+    if not source_figs:
+        raise HTTPException(422, detail="combine requires at least one source figure")
+
+    # Pick a figsize: keep average source size, scaled by grid.
+    avg_w = sum(s.get_size_inches()[0] for s in source_figs) / len(source_figs)
+    avg_h = sum(s.get_size_inches()[1] for s in source_figs) / len(source_figs)
+    new_fig = Figure(figsize=(avg_w * cols, avg_h * rows))
+    FigureCanvasAgg(new_fig)
+    try:
+        new_fig.set_layout_engine("none")
+    except Exception:
+        pass
+
+    margin = 0.06   # outer + inter-cell gutter, figure-fraction
+    cell_w = (1 - margin * (cols + 1)) / cols
+    cell_h = (1 - margin * (rows + 1)) / rows
+
+    for i, src_fig in enumerate(source_figs[:n_cells]):
+        # Deep copy via pickle so transplanting doesn't disturb the source.
+        copy = _unpickle_figure(_pickle_figure(src_fig))
+        if not copy.axes:
+            continue
+        r, c = divmod(i, cols)
+        cell_x = margin + c * (cell_w + margin)
+        cell_y = 1.0 - margin - (r + 1) * cell_h - r * margin
+        for ax in list(copy.axes):
+            ox, oy, ow, oh = ax.get_position().bounds
+            new_x = cell_x + ox * cell_w
+            new_y = cell_y + oy * cell_h
+            new_w = max(0.02, ow * cell_w)
+            new_h = max(0.02, oh * cell_h)
+            ax.remove()
+            ax.figure = new_fig
+            ax.set_position([new_x, new_y, new_w, new_h])
+            new_fig.add_axes(ax)
+    return new_fig
+
+
+# ---------------------------------------------------------------------------
 # Extract subplot into its own figure
 # ---------------------------------------------------------------------------
 
@@ -286,7 +344,7 @@ def create_app(
     if provided, the figure is auto-registered under the name ``default`` and
     the un-scoped /api routes alias to it for backwards compat.
     """
-    app = FastAPI(title="figure-studio", version="0.3.0")
+    app = FastAPI(title="figure-studio", version="0.4.0")
     if registry is None:
         registry = FigureRegistry()
     app.state.registry = registry
@@ -345,7 +403,7 @@ def create_app(
 
     @app.get("/healthz")
     async def healthz() -> JSONResponse:
-        return JSONResponse({"ok": True, "version": "0.3.0", "figures": registry.names()})
+        return JSONResponse({"ok": True, "version": "0.4.0", "figures": registry.names()})
 
     # ----- registry (figures list + add/remove) -----
 
@@ -398,6 +456,41 @@ def create_app(
         _validate_name(new_name)
         await registry.add(new_name, FigureState(fig=new_fig), overwrite=True)
         return JSONResponse({"name": new_name, "extracted_from": name, "axes_index": axes_index})
+
+    @app.post("/api/combine")
+    async def api_combine(request: Request) -> JSONResponse:
+        """Combine N session figures into a single ``rows × cols`` grid figure.
+
+        Body: ``{"figures": ["name1", "name2", ...], "rows": 2, "cols": 2, "as_name": "combined"}``
+        """
+        try:
+            body = await request.json()
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(400, detail=f"invalid JSON: {exc}") from exc
+        names = list(body.get("figures") or [])
+        rows = int(body.get("rows", 1))
+        cols = int(body.get("cols", max(1, len(names))))
+        as_name = body.get("as_name")
+        if not names:
+            raise HTTPException(422, detail="'figures' must be a non-empty list of figure names")
+        if rows < 1 or cols < 1:
+            raise HTTPException(422, detail="'rows' and 'cols' must be >= 1")
+        sources = []
+        missing = []
+        for n in names:
+            try:
+                sources.append(registry.get(n).fig)
+            except HTTPException:
+                missing.append(n)
+        if missing:
+            raise HTTPException(404, detail=f"unknown figure(s): {missing}")
+        new_fig = _combine_figures(sources, rows, cols)
+        new_name = as_name or _unique_name(registry, "combined")
+        _validate_name(new_name)
+        await registry.add(new_name, FigureState(fig=new_fig), overwrite=True)
+        return JSONResponse(
+            {"name": new_name, "combined_from": names, "rows": rows, "cols": cols}
+        )
 
     # ----- per-figure endpoints -----
 

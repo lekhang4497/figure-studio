@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   StudioClient,
   downloadUrl,
@@ -15,6 +15,7 @@ import {
   writeFigureToUrl,
 } from './api.js';
 import Canvas from './Canvas.jsx';
+import CombineModal from './CombineModal.jsx';
 import Inspector from './Inspector.jsx';
 import Toolbar from './Toolbar.jsx';
 
@@ -195,6 +196,8 @@ export default function App() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => dispatch({ type: 'TOAST', toast: null }), 2200);
   }, []);
+
+  const [combineOpen, setCombineOpen] = useState(false);
 
   // ----- Discover figures and pick the active one ---------------------------
 
@@ -445,6 +448,7 @@ session.add(fig, name="my_plot")`}
         onToast={showToast}
         undoCount={state.undoStack.length}
         onUndo={undo}
+        onOpenCombine={() => setCombineOpen(true)}
       />
       <TreeSidebar
         tree={state.snapshot.tree}
@@ -469,6 +473,16 @@ session.add(fig, name="my_plot")`}
         onToast={showToast}
         onExtractAxes={onExtractAxes}
       />
+      {combineOpen && (
+        <CombineModal
+          figures={state.figures}
+          onClose={() => setCombineOpen(false)}
+          onCreated={(newName) => {
+            refreshFigures().then(() => dispatch({ type: 'ACTIVE_FIGURE', name: newName }));
+          }}
+          onToast={showToast}
+        />
+      )}
       {state.toast && <div className={`toast ${state.toast.kind}`}>{state.toast.msg}</div>}
     </div>
   );

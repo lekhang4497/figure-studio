@@ -136,6 +136,19 @@ export async function extractAxes(name, axesIndex, asName) {
   return r.json();
 }
 
+export async function combineFigures({ figures, rows, cols, asName }) {
+  const r = await fetch('/api/combine', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ figures, rows, cols, as_name: asName || undefined }),
+  });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({ detail: r.statusText }));
+    throw new Error(err.detail || `combine failed: ${r.status}`);
+  }
+  return r.json();
+}
+
 export function exportPdfUrl(name, { onlyVisible = false, pad = null } = {}) {
   const parts = [];
   if (onlyVisible) parts.push('only_visible=true');
